@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------------------------
 # Evacuate VMs from ESXi host to get a balanced cluster without DRS )
-#
-# Author: csilver42
+# Note: use at your own risk !!!
+# Author: csilver42 / modified: 2022-01-11
 #-----------------------------------------------------------------------------------------------
 #  
 
@@ -145,34 +145,28 @@ if ($result -eq [System.Windows.Forms.DialogResult]::Cancel)
 ###############################################################################
 
 # Set DRS automation level to "manual" while migrating VMs
-$Clusters = @(get-cluster | where-object {($_.DrsEnabled -eq "True")} | select-object Name,DrsAutomationLevel)
-$ic = 0
-while ($ic -lt $clusters.Count) {
-	get-cluster -Name $clusters[$ic].Name | set-cluster -DrsAutomationLevel Manual -Confirm:$false
-	$ic = $ic + 1
+$ClusterDRS = (get-cluster -name $sourcehost.Parent | where-object {($_.DrsEnabled -eq "True")} | select-object Name,DrsAutomationLevel)
+If ($ClusterDRS.Name -ne ""){
+	set-cluster -cluster $ClusterDRS.Name -DrsAutomationLevel Manual -Confirm:$false
 	}
-
 
 # For each of the online VMs on the ESX host
 do {
                 Foreach ($VM in (Get-VM | Where { $_.PowerState -eq "poweredOn" -and $_.VMHost -like "*$sourcehost*" -and $excludevms -notcontains $_.Name } | Sort-Object -Property MemoryGB -descending)){
     # Move the guest
                 Start-Sleep -s 5
-                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.ConnectionState -eq "Connected")} | Select Name,@{N='MemoryFreeGB';E={[math]::Round(($_.MemoryTotalGB - $_.MemoryUsageGB),2)}} | Sort-Object MemoryFreeGB -descending| select-object -first 1)
+                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)} | Select Name,@{N='MemoryFreeGB';E={[math]::Round(($_.MemoryTotalGB - $_.MemoryUsageGB),2)}} | Sort-Object MemoryFreeGB -descending| select-object -first 1)
                 $VM | Move-VM -Destination $targethost.Name
                 }
 } until (@(Get-VM | Where { $_.PowerState -eq "poweredOn" -and $_.VMHost -like "*$sourcehost*" -and $excludevms -notcontains $_.Name }).Count -eq 0)
  
 # For each of the offline VMs on the ESX host
 do {
-                $i=0
                 Foreach ($VM in (Get-VM | Where { $_.PowerState -eq "poweredOff" -and $_.VMHost -like "*$sourcehost*" -and $excludevms -notcontains $_.Name })){
     # Move the guest
-    if ($i -ne ($destinationhosts.length)){
-                               $destinationhosts.Name[$i]
-                               $VM | Move-VM -Destination $destinationhosts.Name[$i]
-                               $i = $i + 1
-                               }
+                Start-Sleep -s 1
+                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)} | Select Name,@{N='MemoryFreeGB';E={[math]::Round(($_.MemoryTotalGB - $_.MemoryUsageGB),2)}} | Sort-Object MemoryFreeGB -descending| select-object -first 1)
+                $VM | Move-VM -Destination $targethost.Name
                 }
 } until (@(Get-VM | Where { $_.PowerState -eq "poweredOff" -and $_.VMHost -like "*$sourcehost*" -and $excludevms -notcontains $_.Name }).Count -eq 0)
 
@@ -181,10 +175,8 @@ If (@(Get-VM | Where { $_.PowerState -eq "poweredOn" -and $_.VMHost -like "*$sou
                 
   
 # Set DRS automation level to previous value
-$ic = 0
-while ($ic -lt $clusters.Count) {
-	get-cluster -Name $clusters[$ic].Name | set-cluster -DrsAutomationLevel $clusters[$iC].DrsAutomationLevel -Confirm:$false
-	$ic = $ic + 1
+If ($ClusterDRS.Name -ne ""){
+	set-cluster -cluster $ClusterDRS.Name -DrsAutomationLevel $ClusterDRS.DrsAutomationLevel -Confirm:$false
 	}
   
 disconnect-viserver -server $vcenterserver -confirm:$false
