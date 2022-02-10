@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------------------------
 # Balance number of VMs on VMware vSphere cluster (use for VDI)
-# 
-# Author: csilver42
+# Note: use at your own risk !!!
+# Author: csilver42 / modified: 2022-01-10
 #-----------------------------------------------------------------------------------------------
 #  
 
@@ -97,14 +97,12 @@ if ($Limit -lt 2)
 	}
 
 # Set DRS automation level to "manual" while migrating VMs
-$Clusters = @(get-cluster | where-object {($_.DrsEnabled -eq "True")} | select-object Name,DrsAutomationLevel)
-$ic = 0
-while ($ic -lt $clusters.Count) {
-	get-cluster -Name $clusters[$ic].Name | set-cluster -DrsAutomationLevel Manual -Confirm:$false
-	$ic = $ic + 1
+$ClusterDRS = (get-cluster -name $sourcehost.Parent | where-object {($_.DrsEnabled -eq "True")} | select-object Name,DrsAutomationLevel)
+If ($ClusterDRS.Name -ne ""){
+	set-cluster -cluster $ClusterDRS.Name -DrsAutomationLevel Manual -Confirm:$false
 	}
 	
-# For each ESX host assigned more than 32 VMs migrate VMs
+# For each ESX host migrate VMs
 do {
                 Foreach ($sourcehost in (Get-VMHost | Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | where { ($_.NumVM -gt $Limit)} | Sort-object -property NumVM -descending)){
     # Move the guest
@@ -116,10 +114,8 @@ do {
  
  
 # Set DRS automation level to previous value
-$ic = 0
-while ($ic -lt $clusters.Count) {
-	get-cluster -Name $clusters[$ic].Name | set-cluster -DrsAutomationLevel $clusters[$iC].DrsAutomationLevel -Confirm:$false
-	$ic = $ic + 1
+If ($ClusterDRS.Name -ne ""){
+	set-cluster -cluster $ClusterDRS.Name -DrsAutomationLevel $ClusterDRS.DrsAutomationLevel -Confirm:$false
 	}
   
 disconnect-viserver -server $vcenterserver -confirm:$false
