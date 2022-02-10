@@ -107,7 +107,7 @@ do {
                 Foreach ($sourcehost in (Get-VMHost | Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | where { ($_.NumVM -gt $Limit)} | Sort-object -property NumVM -descending)){
     # Move the guest
                 Start-Sleep -s 5;
-                $targethost = (Get-VMHost | Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | Sort-object -property NumVM | Select -First 1).Name;
+                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)}| Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | Sort-object -property NumVM | Select -First 1).Name;
 				Get-VMHost -Name $sourcehost.Name | Get-VM | Where { $_.PowerState -eq "poweredOn"} | Select -First 1 | Move-VM -Destination $targethost
                 }
 } until (@(Get-VMHost | Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | where { ($_.NumVM -gt $Limit)}).Count -eq 0)
