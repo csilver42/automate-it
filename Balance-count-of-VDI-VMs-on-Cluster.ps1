@@ -96,6 +96,7 @@ if ($Limit -lt 2)
 	EXIT #End script
 	}
 
+$sourcehost = VM-Host -Name $sourcehost # collect sourcehost information
 # Set DRS automation level to "manual" while migrating VMs
 $ClusterDRS = (get-cluster -name $sourcehost.Parent | where-object {($_.DrsEnabled -eq "True")} | select-object Name,DrsAutomationLevel)
 If ($ClusterDRS.Name -ne ""){
