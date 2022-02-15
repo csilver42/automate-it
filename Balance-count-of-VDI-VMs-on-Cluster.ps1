@@ -96,28 +96,18 @@ if ($Limit -lt 2)
 	EXIT #End script
 	}
 
-$sourcehost = VM-Host -Name $sourcehost # collect sourcehost information
-# Set DRS automation level to "manual" while migrating VMs
-$ClusterDRS = (get-cluster -name $sourcehost.Parent | where-object {($_.DrsEnabled -eq "True")} | select-object Name,DrsAutomationLevel)
-If ($ClusterDRS.Name -ne ""){
-	set-cluster -cluster $ClusterDRS.Name -DrsAutomationLevel Manual -Confirm:$false
-	}
-	
+
 # For each ESX host migrate VMs
 do {
                 Foreach ($sourcehost in (Get-VMHost | Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | where { ($_.NumVM -gt $Limit)} | Sort-object -property NumVM -descending)){
     # Move the guest
                 Start-Sleep -s 5;
-                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)}| Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | Sort-object -property NumVM | Select -First 1).Name;
+                $sourcehost = VM-Host -Name $sourcehost.Name; # collect sourcehost information
+		$targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)}| Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | Sort-object -property NumVM | Select -First 1).Name;
 				Get-VMHost -Name $sourcehost.Name | Get-VM | Where { $_.PowerState -eq "poweredOn"} | Select -First 1 | Move-VM -Destination $targethost
                 }
 } until (@(Get-VMHost | Select @{N="Cluster";E={Get-Cluster -VMHost $_}}, Name, @{N="NumVM";E={($_ | Get-VM).Count}} | where { ($_.NumVM -gt $Limit)}).Count -eq 0)
  
  
-# Set DRS automation level to previous value
-If ($ClusterDRS.Name -ne ""){
-	set-cluster -cluster $ClusterDRS.Name -DrsAutomationLevel $ClusterDRS.DrsAutomationLevel -Confirm:$false
-	}
-  
 disconnect-viserver -server $vcenterserver -confirm:$false
 
