@@ -166,7 +166,7 @@ do {
                 Foreach ($VM in (Get-VM | Where { $_.PowerState -eq "poweredOff" -and $_.VMHost -like "*$sourcehost*" -and $excludevms -notcontains $_.Name })){
     # Move the guest
                 Start-Sleep -s 1
-                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)} | Select Name,@{N='MemoryFreeGB';E={[math]::Round(($_.MemoryTotalGB - $_.MemoryUsageGB),2)}} | Sort-Object MemoryFreeGB -descending| select-object -first 1)
+                $targethost = (Get-VMHost | Where { ($_.Name -ne "$sourcehost") -and ($_.State -eq "Connected") -and ($_.Parent -eq $sourcehost.Parent)} | Select Name | Select-Object -first 1)
                 $VM | Move-VM -Destination $targethost.Name
                 }
 } until (@(Get-VM | Where { $_.PowerState -eq "poweredOff" -and $_.VMHost -like "*$sourcehost*" -and $excludevms -notcontains $_.Name }).Count -eq 0)
